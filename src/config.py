@@ -27,7 +27,7 @@ STATE_REGISTRY: dict[str, StateConfig] = {
         primary_adapter=FileIngestorAdapter,
         backup_adapters=[],
         supports_file_upload=True,
-        notes="Cook County provides Excel downloads. No live scraping available."
+        notes="Upload county files. Cook County publishes Excel lists."
     ),
     "FL": StateConfig(
         state_code="FL",
@@ -35,47 +35,47 @@ STATE_REGISTRY: dict[str, StateConfig] = {
         primary_adapter=LienHubAdapter,
         backup_adapters=[FileIngestorAdapter],
         supports_file_upload=True,
-        notes="30+ counties on LienHub. County-held liens available year-round."
+        notes="Live scraping available. 30+ counties, year-round data."
     ),
     "AZ": StateConfig(
         state_code="AZ",
         state_name="Arizona",
-        primary_adapter=RealAuctionAdapter,
-        backup_adapters=[FileIngestorAdapter],
+        primary_adapter=FileIngestorAdapter,
+        backup_adapters=[],
         supports_file_upload=True,
-        notes="Maricopa and Pima use RealAuction."
+        notes="Upload county files. Scraper coming soon."
     ),
     "NJ": StateConfig(
         state_code="NJ",
         state_name="New Jersey",
-        primary_adapter=RealAuctionAdapter,
-        backup_adapters=[FileIngestorAdapter],
+        primary_adapter=FileIngestorAdapter,
+        backup_adapters=[],
         supports_file_upload=True,
-        notes="Various counties on RealAuction platform."
+        notes="Upload county files. Scraper coming soon."
     ),
     "IN": StateConfig(
         state_code="IN",
         state_name="Indiana",
-        primary_adapter=ZeusAdapter,
-        backup_adapters=[FileIngestorAdapter],
+        primary_adapter=FileIngestorAdapter,
+        backup_adapters=[],
         supports_file_upload=True,
-        notes="Marion, Lake counties use Zeus Auction."
+        notes="Upload county files. Scraper coming soon."
     ),
     "CO": StateConfig(
         state_code="CO",
         state_name="Colorado",
-        primary_adapter=RealAuctionAdapter,
-        backup_adapters=[ZeusAdapter, FileIngestorAdapter],
+        primary_adapter=FileIngestorAdapter,
+        backup_adapters=[],
         supports_file_upload=True,
-        notes="Split between RealAuction and Zeus depending on county."
+        notes="Upload county files. Scraper coming soon."
     ),
     "IA": StateConfig(
         state_code="IA",
         state_name="Iowa",
-        primary_adapter=ZeusAdapter,
-        backup_adapters=[FileIngestorAdapter],
+        primary_adapter=FileIngestorAdapter,
+        backup_adapters=[],
         supports_file_upload=True,
-        notes="Polk, Linn counties on Zeus."
+        notes="Upload county files. Scraper coming soon."
     ),
     "MS": StateConfig(
         state_code="MS",
@@ -83,7 +83,7 @@ STATE_REGISTRY: dict[str, StateConfig] = {
         primary_adapter=FileIngestorAdapter,
         backup_adapters=[],
         supports_file_upload=True,
-        notes="Tax deed state. Data typically available via county downloads."
+        notes="Upload county files. Tax deed state."
     ),
     "AL": StateConfig(
         state_code="AL",
@@ -91,7 +91,7 @@ STATE_REGISTRY: dict[str, StateConfig] = {
         primary_adapter=FileIngestorAdapter,
         backup_adapters=[],
         supports_file_upload=True,
-        notes="Tax lien state. County-by-county data sources."
+        notes="Upload county files. Tax lien state."
     ),
     "SC": StateConfig(
         state_code="SC",
@@ -99,7 +99,7 @@ STATE_REGISTRY: dict[str, StateConfig] = {
         primary_adapter=FileIngestorAdapter,
         backup_adapters=[],
         supports_file_upload=True,
-        notes="Tax deed state. Data via county tax offices."
+        notes="Upload county files. Tax deed state."
     ),
 }
 
