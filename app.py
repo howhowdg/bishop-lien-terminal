@@ -621,25 +621,30 @@ def render_welcome():
 
         with tab1:
             st.markdown("")
+            # States with live scraping capability
+            live_states = ["FL"]  # Add more as scrapers are built
             state = st.selectbox(
                 "STATE",
-                options=["FL"],
-                format_func=lambda x: f"{x} - {STATE_REGISTRY[x].state_name}",
+                options=list(STATE_REGISTRY.keys()),
+                format_func=lambda x: f"{x} - {STATE_REGISTRY[x].state_name}" + (" ✓" if x in live_states else ""),
                 label_visibility="collapsed"
             )
 
             st.info(f"📡 {STATE_REGISTRY[state].notes}")
             st.markdown("")
 
-            if st.button("[ FETCH ALL LIENS ]", type="primary", use_container_width=True, key="fetch_main"):
-                with st.spinner(f"SCANNING {state} COUNTIES..."):
-                    try:
-                        liens = scrape_all_counties(state)
-                        st.session_state.liens_data = liens
-                        st.session_state.last_fetch_time = date.today()
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"ERROR: {str(e)}")
+            if state in live_states:
+                if st.button("[ FETCH ALL LIENS ]", type="primary", use_container_width=True, key="fetch_main"):
+                    with st.spinner(f"SCANNING {state} COUNTIES..."):
+                        try:
+                            liens = scrape_all_counties(state)
+                            st.session_state.liens_data = liens
+                            st.session_state.last_fetch_time = date.today()
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"ERROR: {str(e)}")
+            else:
+                st.warning(f"Live scraping not available for {state} yet. Use UPLOAD FILE tab.")
 
         with tab2:
             st.markdown("")
