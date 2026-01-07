@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Debug files
+debug_*.py
+debug_*.html
+debug_*.png
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Misc
+*.log
+.claude/
