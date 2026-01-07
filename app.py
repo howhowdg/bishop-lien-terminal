@@ -320,6 +320,35 @@ TERMINAL_CSS = """
     .welcome-text strong {
         color: var(--amber);
     }
+
+    /* Tabs styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0;
+        background-color: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        background-color: transparent;
+        color: var(--text-secondary);
+        border: none;
+        border-radius: 0;
+        font-family: 'IBM Plex Mono', monospace;
+        font-weight: 600;
+        padding: 0.75rem 1.5rem;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background-color: var(--amber) !important;
+        color: var(--bg-primary) !important;
+    }
+
+    .stTabs [data-baseweb="tab-panel"] {
+        background-color: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        border-top: none;
+        padding: 1.5rem;
+    }
 </style>
 """
 
@@ -335,94 +364,47 @@ def init_session_state():
 
 
 def render_sidebar():
-    """Render simplified sidebar."""
+    """Render sidebar with instructions and filters."""
     st.sidebar.markdown("### BISHOP LIEN TERMINAL")
     st.sidebar.markdown("---")
 
-    # Mode selection
-    mode = st.sidebar.radio(
-        "MODE",
-        ["SCRAPE STATE", "UPLOAD FILE"],
-    )
+    # Instructions - always visible
+    st.sidebar.markdown("""
+**HOW TO USE**
+
+1. Select a state below
+2. Click FETCH to load liens
+3. Filter results as needed
+4. Export to CSV
+    """)
 
     st.sidebar.markdown("---")
 
-    if mode == "SCRAPE STATE":
-        render_state_scraper()
-    else:
-        render_upload_controls()
-
-    # Filters (if data loaded)
+    # Filters (only if data loaded)
     if st.session_state.liens_data is not None and st.session_state.liens_data.count > 0:
-        st.sidebar.markdown("---")
         render_filter_controls()
+        st.sidebar.markdown("---")
+
+    # Supported sources
+    st.sidebar.markdown("""
+**DATA SOURCES**
+
+| STATE | STATUS |
+|-------|--------|
+| FL | <span class='status-online'>ONLINE</span> |
+| IL | UPLOAD |
+| AZ | -- |
+| NJ | -- |
+    """, unsafe_allow_html=True)
 
     # Status footer
     st.sidebar.markdown("---")
     st.sidebar.markdown(
-        f"<small style='color: #666;'>SYS STATUS: <span class='status-online'>ONLINE</span><br>"
-        f"VER 1.0.0 | {date.today().strftime('%Y.%m.%d')}</small>",
+        f"<small style='color: #666;'>VER 1.0.0 | {date.today().strftime('%Y.%m.%d')}</small>",
         unsafe_allow_html=True
     )
 
 
-def render_state_scraper():
-    """Simple state selector that scrapes all counties."""
-    st.sidebar.markdown("**SELECT STATE**")
-
-    # Only show states with live scraping
-    scrape_states = ["FL"]
-
-    state = st.sidebar.selectbox(
-        "State",
-        options=scrape_states,
-        format_func=lambda x: f"{x} - {STATE_REGISTRY[x].state_name}",
-        label_visibility="collapsed"
-    )
-
-    config = STATE_REGISTRY[state]
-    st.sidebar.info(f"📡 {config.notes}")
-
-    if st.sidebar.button("[ FETCH ALL LIENS ]", type="primary", use_container_width=True):
-        with st.spinner(f"SCANNING {state} COUNTIES..."):
-            try:
-                liens = scrape_all_counties(state)
-                st.session_state.liens_data = liens
-                st.session_state.last_fetch_time = date.today()
-                st.sidebar.success(f"✓ LOADED {liens.count} LIENS")
-            except Exception as e:
-                st.sidebar.error(f"ERROR: {str(e)}")
-
-
-def render_upload_controls():
-    """Render file upload controls."""
-    st.sidebar.markdown("**UPLOAD DATA FILE**")
-
-    state = st.sidebar.selectbox(
-        "State",
-        options=list(STATE_REGISTRY.keys()),
-        format_func=lambda x: f"{x} - {STATE_REGISTRY[x].state_name}",
-        key="upload_state",
-        label_visibility="collapsed"
-    )
-
-    county = st.sidebar.text_input("COUNTY", placeholder="e.g., Cook")
-
-    uploaded_file = st.sidebar.file_uploader(
-        "CSV/XLSX FILE",
-        type=["csv", "xlsx", "xls"],
-    )
-
-    if uploaded_file:
-        if st.sidebar.button("[ PROCESS FILE ]", type="primary", use_container_width=True):
-            with st.spinner("PROCESSING..."):
-                try:
-                    liens = process_uploaded_file(uploaded_file.getvalue(), state, county or None)
-                    st.session_state.liens_data = liens
-                    st.session_state.last_fetch_time = date.today()
-                    st.sidebar.success(f"✓ LOADED {liens.count} LIENS")
-                except Exception as e:
-                    st.sidebar.error(f"ERROR: {str(e)}")
 
 
 def render_filter_controls():
@@ -625,41 +607,68 @@ def render_main_content():
 
 
 def render_welcome():
-    """Welcome screen."""
-    st.markdown("""
-<div class="welcome-text">
+    """Welcome screen with prominent action controls."""
 
-## SYSTEM READY
+    # Center the action area
+    col1, col2, col3 = st.columns([1, 2, 1])
 
-**BISHOP LIEN TERMINAL** aggregates tax lien certificate data from multiple
-county auction platforms into a single unified interface.
+    with col2:
+        st.markdown("### SELECT DATA SOURCE")
+        st.markdown("")
 
----
+        # Tabs for different modes
+        tab1, tab2 = st.tabs(["SCRAPE STATE", "UPLOAD FILE"])
 
-### COMMANDS
+        with tab1:
+            st.markdown("")
+            state = st.selectbox(
+                "STATE",
+                options=["FL"],
+                format_func=lambda x: f"{x} - {STATE_REGISTRY[x].state_name}",
+                label_visibility="collapsed"
+            )
 
-1. Select **SCRAPE STATE** → Choose state → **FETCH ALL LIENS**
-2. Data loads from all available counties
-3. Filter by LTV, face amount, county
-4. Export results to CSV
+            st.info(f"📡 {STATE_REGISTRY[state].notes}")
+            st.markdown("")
 
----
+            if st.button("[ FETCH ALL LIENS ]", type="primary", use_container_width=True, key="fetch_main"):
+                with st.spinner(f"SCANNING {state} COUNTIES..."):
+                    try:
+                        liens = scrape_all_counties(state)
+                        st.session_state.liens_data = liens
+                        st.session_state.last_fetch_time = date.today()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"ERROR: {str(e)}")
 
-### SUPPORTED SOURCES
+        with tab2:
+            st.markdown("")
+            upload_state = st.selectbox(
+                "STATE",
+                options=list(STATE_REGISTRY.keys()),
+                format_func=lambda x: f"{x} - {STATE_REGISTRY[x].state_name}",
+                key="upload_state_main",
+                label_visibility="collapsed"
+            )
 
-| STATE | PLATFORM | STATUS |
-|-------|----------|--------|
-| FL    | LienHub  | ONLINE |
-| IL    | Upload   | READY  |
-| AZ    | Pending  | --     |
-| NJ    | Pending  | --     |
+            county = st.text_input("COUNTY NAME", placeholder="e.g., Cook")
 
----
+            uploaded_file = st.file_uploader(
+                "SELECT FILE",
+                type=["csv", "xlsx", "xls"],
+                label_visibility="collapsed"
+            )
 
-<small>AWAITING INPUT...</small>
-
-</div>
-    """, unsafe_allow_html=True)
+            if uploaded_file:
+                if st.button("[ PROCESS FILE ]", type="primary", use_container_width=True, key="process_main"):
+                    with st.spinner("PROCESSING..."):
+                        try:
+                            liens = process_uploaded_file(uploaded_file.getvalue(), upload_state, county or None)
+                            st.session_state.liens_data = liens
+                            st.session_state.last_fetch_time = date.today()
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"ERROR: {str(e)}")
 
 
 def main():
