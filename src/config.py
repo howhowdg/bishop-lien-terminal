@@ -3,7 +3,19 @@
 from dataclasses import dataclass, field
 from typing import Optional, Type
 
-from .adapters import LienSource, RealAuctionAdapter, ZeusAdapter, FileIngestorAdapter, LienHubAdapter
+from .adapters import (
+    LienSource,
+    RealAuctionAdapter,
+    ZeusAdapter,
+    FileIngestorAdapter,
+    LienHubAdapter,
+    GovEaseAdapter,
+    ArizonaTaxSaleAdapter,
+    NJTaxSaleAdapter,
+    ColoradoTaxSaleAdapter,
+    SCTaxSaleAdapter,
+    CookCountyAdapter,
+)
 from .models import SourcePlatform
 
 
@@ -16,97 +28,108 @@ class StateConfig:
     primary_adapter: Type[LienSource]
     backup_adapters: list[Type[LienSource]] = field(default_factory=list)
     supports_file_upload: bool = True
+    live_scraping: bool = False
     notes: str = ""
 
 
 # Master registry of supported states and their adapters
 STATE_REGISTRY: dict[str, StateConfig] = {
-    "IL": StateConfig(
-        state_code="IL",
-        state_name="Illinois",
-        primary_adapter=FileIngestorAdapter,
-        backup_adapters=[],
-        supports_file_upload=True,
-        notes="Upload county files. Cook County publishes Excel lists."
-    ),
     "FL": StateConfig(
         state_code="FL",
         state_name="Florida",
         primary_adapter=LienHubAdapter,
         backup_adapters=[FileIngestorAdapter],
         supports_file_upload=True,
-        notes="Live scraping available. 30+ counties, year-round data."
+        live_scraping=True,
+        notes="Live scraping via LienHub. 30+ counties, year-round county-held liens."
     ),
     "AZ": StateConfig(
         state_code="AZ",
         state_name="Arizona",
-        primary_adapter=FileIngestorAdapter,
-        backup_adapters=[],
+        primary_adapter=ArizonaTaxSaleAdapter,
+        backup_adapters=[FileIngestorAdapter],
         supports_file_upload=True,
-        notes="Upload county files. Scraper coming soon."
+        live_scraping=False,
+        notes="Uses arizonataxsale.com (registration required). 16% max rate. Feb auctions."
+    ),
+    "IL": StateConfig(
+        state_code="IL",
+        state_name="Illinois",
+        primary_adapter=CookCountyAdapter,
+        backup_adapters=[FileIngestorAdapter],
+        supports_file_upload=True,
+        live_scraping=False,
+        notes="Cook County via cooktaxsale.com (registration/$250 lists). Dec auctions."
     ),
     "NJ": StateConfig(
         state_code="NJ",
         state_name="New Jersey",
-        primary_adapter=FileIngestorAdapter,
-        backup_adapters=[],
+        primary_adapter=NJTaxSaleAdapter,
+        backup_adapters=[FileIngestorAdapter],
         supports_file_upload=True,
-        notes="Upload county files. Scraper coming soon."
+        live_scraping=False,
+        notes="565 municipalities, each runs own sale. newjerseytaxsale.com (registration required)."
     ),
     "IN": StateConfig(
         state_code="IN",
         state_name="Indiana",
-        primary_adapter=FileIngestorAdapter,
-        backup_adapters=[],
+        primary_adapter=ZeusAdapter,
+        backup_adapters=[FileIngestorAdapter],
         supports_file_upload=True,
-        notes="Upload county files. Scraper coming soon."
+        live_scraping=False,
+        notes="Uses Zeus Auction (zeusauction.com). Registration required."
     ),
     "CO": StateConfig(
         state_code="CO",
         state_name="Colorado",
-        primary_adapter=FileIngestorAdapter,
-        backup_adapters=[],
+        primary_adapter=ColoradoTaxSaleAdapter,
+        backup_adapters=[ZeusAdapter, FileIngestorAdapter],
         supports_file_upload=True,
-        notes="Upload county files. Scraper coming soon."
+        live_scraping=False,
+        notes="Uses coloradotaxsale.com or Zeus. 14% rate (2025). Oct-Nov auctions."
     ),
     "IA": StateConfig(
         state_code="IA",
         state_name="Iowa",
-        primary_adapter=FileIngestorAdapter,
-        backup_adapters=[],
+        primary_adapter=GovEaseAdapter,
+        backup_adapters=[ZeusAdapter, FileIngestorAdapter],
         supports_file_upload=True,
-        notes="Upload county files. Scraper coming soon."
+        live_scraping=False,
+        notes="Uses GovEase or Zeus (registration required). 24% rate. June auctions."
     ),
     "MS": StateConfig(
         state_code="MS",
         state_name="Mississippi",
-        primary_adapter=FileIngestorAdapter,
-        backup_adapters=[],
+        primary_adapter=GovEaseAdapter,
+        backup_adapters=[FileIngestorAdapter],
         supports_file_upload=True,
-        notes="Upload county files. Tax deed state."
+        live_scraping=False,
+        notes="Uses GovEase (govease.com). Premium bid auction. April/August sales."
     ),
     "AL": StateConfig(
         state_code="AL",
         state_name="Alabama",
-        primary_adapter=FileIngestorAdapter,
-        backup_adapters=[],
+        primary_adapter=GovEaseAdapter,
+        backup_adapters=[FileIngestorAdapter],
         supports_file_upload=True,
-        notes="Upload county files. Tax lien state."
+        live_scraping=False,
+        notes="Uses GovEase (govease.com). Interest rate bid-down (max 12%). March-June."
     ),
     "SC": StateConfig(
         state_code="SC",
         state_name="South Carolina",
-        primary_adapter=FileIngestorAdapter,
-        backup_adapters=[],
+        primary_adapter=SCTaxSaleAdapter,
+        backup_adapters=[FileIngestorAdapter],
         supports_file_upload=True,
-        notes="Upload county files. Tax deed state."
+        live_scraping=False,
+        notes="TAX DEED state (not lien). County websites. 12-month redemption. Nov-Dec."
     ),
 }
 
 
 # Platform -> States mapping for quick lookup
 PLATFORM_STATES: dict[SourcePlatform, list[str]] = {
-    SourcePlatform.REALAUCTION: ["FL", "AZ", "CO", "NJ"],
+    SourcePlatform.REALAUCTION: ["FL", "AZ", "CO", "NJ", "IL"],
     SourcePlatform.ZEUS: ["IN", "IA", "CO"],
     SourcePlatform.MANUAL_UPLOAD: list(STATE_REGISTRY.keys()),
 }
@@ -210,6 +233,22 @@ def get_counties_for_state(state: str, platform: Optional[SourcePlatform] = None
         return adapter.get_available_counties()
     except Exception:
         return []
+
+
+def is_live_scraping_available(state: str) -> bool:
+    """Check if live scraping is available for a state."""
+    state = state.upper()
+    if state not in STATE_REGISTRY:
+        return False
+    return STATE_REGISTRY[state].live_scraping
+
+
+def get_state_notes(state: str) -> str:
+    """Get notes/info about a state's tax lien system."""
+    state = state.upper()
+    if state not in STATE_REGISTRY:
+        return ""
+    return STATE_REGISTRY[state].notes
 
 
 # Investment metrics configuration

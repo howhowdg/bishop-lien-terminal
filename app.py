@@ -10,7 +10,7 @@ from typing import Optional, List
 import pandas as pd
 import streamlit as st
 
-from src.config import STATE_REGISTRY, DEFAULT_METRICS
+from src.config import STATE_REGISTRY, DEFAULT_METRICS, is_live_scraping_available, get_adapter_for_state
 from src.models import SourcePlatform, TaxLien, LienBatch
 from src.adapters import FileIngestorAdapter, LienHubAdapter
 from src.adapters.file_ingestor import ColumnMappingHelper
@@ -469,24 +469,38 @@ async def scrape_county(county_slug: str) -> List[TaxLien]:
 
 
 def scrape_all_counties(state: str) -> LienBatch:
-    """Scrape all counties for a state."""
-    async def _scrape_all():
-        if state == "FL":
-            counties = [
-                "duval", "hillsborough", "orange", "broward", "miamidade",
-                "pinellas", "lee", "brevard", "volusia", "pasco"
-            ]
-            all_liens = []
-            for county in counties:
-                liens = await scrape_county(county)
-                all_liens.extend(liens)
-            return all_liens
-        return []
+    """Scrape all counties for a state using the appropriate adapter."""
+    async def _scrape():
+        adapter = get_adapter_for_state(state, headless=False)
+        counties = adapter.get_available_counties()
 
-    liens = asyncio.run(_scrape_all())
+        # For states with many counties, limit to first 10
+        if len(counties) > 10:
+            print(f"Limiting to first 10 counties (of {len(counties)} total)")
+            counties = counties[:10]
+
+        all_liens = []
+        source_url = getattr(adapter, 'base_url', '')
+
+        for county in counties:
+            try:
+                print(f"  Scraping {county}...")
+                county_adapter = get_adapter_for_state(state, county=county, headless=False)
+                batch = await county_adapter.fetch(max_records=100)
+                if batch.liens:
+                    all_liens.extend(batch.liens)
+                    print(f"    Found {len(batch.liens)} liens")
+                    source_url = batch.source_url or source_url
+            except Exception as e:
+                print(f"  Error scraping {county}: {e}")
+                continue
+
+        return all_liens, source_url
+
+    liens, source_url = asyncio.run(_scrape())
     return LienBatch(
         liens=liens,
-        source_url="https://lienhub.com",
+        source_url=source_url,
         scrape_timestamp=date.today(),
         state_filter=state,
     )
@@ -621,30 +635,40 @@ def render_welcome():
 
         with tab1:
             st.markdown("")
-            # States with live scraping capability
-            live_states = ["FL"]  # Add more as scrapers are built
             state = st.selectbox(
                 "STATE",
                 options=list(STATE_REGISTRY.keys()),
-                format_func=lambda x: f"{x} - {STATE_REGISTRY[x].state_name}" + (" ✓" if x in live_states else ""),
+                format_func=lambda x: f"{x} - {STATE_REGISTRY[x].state_name}" + (" [LIVE]" if is_live_scraping_available(x) else ""),
                 label_visibility="collapsed"
             )
 
-            st.info(f"📡 {STATE_REGISTRY[state].notes}")
+            # Show state info and adapter details
+            config = STATE_REGISTRY[state]
+            is_live = is_live_scraping_available(state)
+
+            if is_live:
+                st.success(f"✓ {config.notes}")
+            else:
+                st.warning(f"⚠ {config.notes}")
+                st.caption(f"Platform: {config.primary_adapter.__name__} | Try scraping anyway or use file upload.")
+
             st.markdown("")
 
-            if state in live_states:
-                if st.button("[ FETCH ALL LIENS ]", type="primary", use_container_width=True, key="fetch_main"):
-                    with st.spinner(f"SCANNING {state} COUNTIES..."):
-                        try:
-                            liens = scrape_all_counties(state)
+            # Allow scraping attempt for all states
+            btn_label = "[ FETCH LIVE DATA ]" if is_live else "[ ATTEMPT SCRAPE ]"
+            if st.button(btn_label, type="primary", use_container_width=True, key="fetch_main"):
+                with st.spinner(f"SCANNING {state}..."):
+                    try:
+                        liens = scrape_all_counties(state)
+                        if liens:
                             st.session_state.liens_data = liens
                             st.session_state.last_fetch_time = date.today()
                             st.rerun()
-                        except Exception as e:
-                            st.error(f"ERROR: {str(e)}")
-            else:
-                st.warning(f"Live scraping not available for {state} yet. Use UPLOAD FILE tab.")
+                        else:
+                            st.warning(f"No data returned. Platform may require registration. Try file upload.")
+                    except Exception as e:
+                        st.error(f"ERROR: {str(e)}")
+                        st.info("This platform likely requires registration. Use UPLOAD FILE tab instead.")
 
         with tab2:
             st.markdown("")
