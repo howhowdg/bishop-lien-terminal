@@ -22,3 +22,4 @@ sqlalchemy>=2.0.0
 
 # Async support
 aiohttp>=3.9.0
+nest-asyncio>=1.5.0

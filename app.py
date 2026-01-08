@@ -147,14 +147,17 @@ async def scrape_county(county_slug: str) -> List[TaxLien]:
 
 def scrape_all_counties(state: str) -> LienBatch:
     """Scrape all counties for a state using the appropriate adapter."""
+    import nest_asyncio
+    nest_asyncio.apply()
+
     async def _scrape():
-        adapter = get_adapter_for_state(state, headless=False)
+        adapter = get_adapter_for_state(state, headless=True)
         counties = adapter.get_available_counties()
 
-        # For states with many counties, limit to first 10
-        if len(counties) > 10:
-            print(f"Limiting to first 10 counties (of {len(counties)} total)")
-            counties = counties[:10]
+        # For states with many counties, limit to first 5
+        if len(counties) > 5:
+            print(f"Limiting to first 5 counties (of {len(counties)} total)")
+            counties = counties[:5]
 
         all_liens = []
         source_url = getattr(adapter, 'base_url', '')
@@ -162,8 +165,8 @@ def scrape_all_counties(state: str) -> LienBatch:
         for county in counties:
             try:
                 print(f"  Scraping {county}...")
-                county_adapter = get_adapter_for_state(state, county=county, headless=False)
-                batch = await county_adapter.fetch(max_records=100)
+                county_adapter = get_adapter_for_state(state, county=county, headless=True)
+                batch = await county_adapter.fetch(max_records=50)
                 if batch.liens:
                     all_liens.extend(batch.liens)
                     print(f"    Found {len(batch.liens)} liens")
@@ -174,7 +177,13 @@ def scrape_all_counties(state: str) -> LienBatch:
 
         return all_liens, source_url
 
-    liens, source_url = asyncio.run(_scrape())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        liens, source_url = loop.run_until_complete(_scrape())
+    finally:
+        loop.close()
+
     return LienBatch(
         liens=liens,
         source_url=source_url,
